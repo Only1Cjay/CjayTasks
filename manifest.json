@@ -1,0 +1,19 @@
+{
+  "name": "CjayTasks",
+  "short_name": "CjayTasks",
+  "description": "Task manager by Cjay — a focused way to plan and complete your day.",
+  "start_url": "/CjayTasks/",
+  "scope": "/CjayTasks/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F3FB",
+  "theme_color": "#7B5EA7",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
