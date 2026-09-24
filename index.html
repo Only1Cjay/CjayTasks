@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CjayTasks</title>
+<meta name="theme-color" content="#7B5EA7">
+<meta name="description" content="Task manager by Cjay — a focused way to plan and complete your day.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CjayTasks">
+
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+
+<!-- Inline theme loader (prevents flash on load) -->
+<script>
+  (function(){
+    try{
+      var t = localStorage.getItem('cjaytasks_theme');
+      if(t !== 'dark' && t !== 'light') t = 'light';
+      document.addEventListener('DOMContentLoaded', function(){
+        document.body.setAttribute('data-theme', t);
+      });
+      if(document.body){
+        document.body.setAttribute('data-theme', t);
+      }
+    }catch(e){}
+  })();
+</script>
+
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://apis.google.com/js/api.js" async defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body data-theme="light">
+
+<!-- ============================================================
+     LOADING SCREEN
+     ============================================================ -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Loading CjayTasks…</div>
+</div>
+
+<!-- ============================================================
+     PRINT VIEW (only visible when printing)
+     ============================================================ -->
+<div class="print-view" id="printView"></div>
+
+<!-- ============================================================
+     APP
+     ============================================================ -->
+<div class="app">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-logo" id="brandLogo">
+        <i class="fas fa-list-check"></i>
+      </div>
+      <div class="brand-meta">
+        <div class="brand-eyebrow">Tasks</div>
+        <div class="brand-name">CjayTasks</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="themeBtn" title="Toggle theme">
+        <i class="fas fa-moon"></i>
+      </button>
+      <div class="menu-wrap">
+        <button class="icon-btn" id="menuBtn" title="Menu" aria-expanded="false">
+          <i class="fas fa-bars"></i>
+        </button>
+        <div class="menu-dropdown hidden" id="menuDropdown">
+          <button class="menu-item" id="searchBtn">
+            <i class="fas fa-search"></i>
+            <span>Search</span>
+          </button>
+          <button class="menu-item" id="calendarBtn">
+            <i class="fas fa-calendar-day"></i>
+            <span>Calendar</span>
+          </button>
+          <button class="menu-item" id="historyBtn">
+            <i class="fas fa-clock-rotate-left"></i>
+            <span>History</span>
+          </button>
+          <button class="menu-item" id="reportsBtn">
+            <i class="fas fa-file-lines"></i>
+            <span>Reports</span>
+          </button>
+          <button class="menu-item" id="settingsBtn">
+            <i class="fas fa-gear"></i>
+            <span>Settings</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View-only badge -->
+  <div class="view-badge hidden" id="viewBadge">
+    <i class="fas fa-eye"></i> View Only
+  </div>
+
+  <!-- Slim hero: completion ring + message -->
+  <div class="hero-slim">
+    <div class="hero-ring-wrap">
+      <svg class="hero-ring" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="27" fill="none" stroke="var(--line)" stroke-width="5"/>
+        <circle cx="32" cy="32" r="27" fill="none" stroke="url(#heroGradient)" stroke-width="5"
+          stroke-linecap="round" stroke-dasharray="169.65" stroke-dashoffset="169.65"
+          transform="rotate(-90 32 32)" id="heroRingFill"/>
+        <defs>
+          <linearGradient id="heroGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#7B5EA7"/>
+            <stop offset="100%" stop-color="#3DA69B"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="hero-ring-inner" id="heroRingPct">0%</div>
+    </div>
+    <div class="hero-text">
+      <div class="hero-title" id="heroTitle">All clear</div>
+      <div class="hero-sub" id="heroSub">Nothing on your plate right now.</div>
+    </div>
+  </div>
+
+  <!-- Segmented control: List / Today / Upcoming -->
+  <div class="seg-control" id="viewSegControl">
+    <button type="button" data-view="list" class="active">List</button>
+    <button type="button" data-view="today">Today</button>
+    <button type="button" data-view="upcoming">Upcoming</button>
+  </div>
+
+  <!-- Task list area -->
+  <div id="taskList" class="task-list"></div>
+
+  <!-- Empty state -->
+  <div class="empty-state hidden" id="emptyState">
+    <svg viewBox="0 0 120 120" fill="none">
+      <rect x="26" y="30" width="68" height="72" rx="14" stroke="currentColor" stroke-width="2.5" opacity=".35"/>
+      <path d="M42 56l8 8 16-16" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>
+      <path d="M42 82l8 8 16-16" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".35"/>
+      <circle cx="88" cy="38" r="8" stroke="currentColor" stroke-width="2.5" opacity=".45"/>
+      <path d="M88 34v5l3 2" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity=".45"/>
+    </svg>
+    <div class="empty-title" id="emptyTitle">No tasks yet</div>
+    <div class="empty-sub" id="emptySub">Tap the + button to add your first task.</div>
+  </div>
+
+</div><!-- /.app -->
+
+<!-- ============================================================
+     FAB — Add Task
+     ============================================================ -->
+<button class="fab" id="fabBtn" title="Add Task">
+  <i class="fas fa-plus"></i>
+</button>
+
+<!-- ============================================================
+     MODAL OVERLAY (shared wrapper)
+     ============================================================ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<!-- ============================================================
+     TOAST
+     ============================================================ -->
+<div class="toast" id="toast"></div>
+
+<!-- ============================================================
+     OFFLINE BANNER
+     ============================================================ -->
+<div class="offline-banner" id="offlineBanner">
+  <i class="fas fa-plane-slash"></i>
+  <span>You're offline — changes save locally and sync when you're back</span>
+</div>
+
+<script src="app.js" defer></script>
+
+<script>
+// Service worker registration + update detection
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      setInterval(() => reg.update(), 30 * 60 * 1000);
+
+      if (reg.waiting) {
+        window.dispatchEvent(new CustomEvent('sw-update-available', {
+          detail: { registration: reg }
+        }));
+      }
+
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if (!newSW) return;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            window.dispatchEvent(new CustomEvent('sw-update-available', {
+              detail: { registration: reg }
+            }));
+          }
+        });
+      });
+    }).catch(err => console.warn('SW registration failed:', err));
+
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+        window.dispatchEvent(new CustomEvent('sw-update-available', {
+          detail: { fromMessage: true }
+        }));
+      }
+    });
+  });
+}
+</script>
+
+</body>
+</html>
