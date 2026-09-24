@@ -1,0 +1,16 @@
+{
+  "name": "BookHabits",
+  "short_name": "BookHabits",
+"start_url": "/BookHabits/",
+  "display": "standalone",
+  "background_color": "#f2f5fa",
+  "theme_color": "#1a7ab0",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
