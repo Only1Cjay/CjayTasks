@@ -5,14 +5,22 @@
       <stop offset="100%" stop-color="#3DA69B"/>
     </linearGradient>
   </defs>
+
+  <!-- Rounded gradient background -->
   <rect width="512" height="512" rx="120" fill="url(#g)"/>
-  <g fill="#ffffff" transform="translate(96, 96) scale(0.625)">
-    <path d="M208 80H96a32 32 0 0 0-32 32v288a32 32 0 0 0 32 32h224a32 32 0 0 0 32-32V176zm0 0"/>
-  </g>
-  <g fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" transform="translate(64, 64) scale(0.75)">
-    <polyline points="64 144 112 192 208 96"/>
-    <polyline points="64 304 112 352 208 256"/>
-    <line x1="272" y1="144" x2="384" y2="144"/>
-    <line x1="272" y1="304" x2="384" y2="304"/>
+
+  <!-- Task list: 3 rows, each with a checkmark and a line -->
+  <g fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Row 1: checkmark + line -->
+    <polyline points="130 160 170 200 230 130"/>
+    <line x1="290" y1="165" x2="390" y2="165"/>
+
+    <!-- Row 2: checkmark + line -->
+    <polyline points="130 260 170 300 230 230"/>
+    <line x1="290" y1="265" x2="390" y2="265"/>
+
+    <!-- Row 3: checkmark + line -->
+    <polyline points="130 360 170 400 230 330"/>
+    <line x1="290" y1="365" x2="390" y2="365"/>
   </g>
 </svg>
