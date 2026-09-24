@@ -54,6 +54,250 @@ function uid(){
   return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
 }
 
+/* ============================================================
+   CUSTOM SELECT COMPONENT
+   ============================================================ */
+let openCustomSelect = null;
+
+function buildCustomSelect({ container, options, value, placeholder, onChange, onOpen }){
+  if(!container) return;
+
+  let selected = options.find(o => o.value === value) || null;
+  const label = selected ? selected.label : (placeholder || 'Select…');
+
+  container.innerHTML = `
+    <button type="button" class="custom-select-trigger">
+      <span class="custom-select-label ${selected ? '' : 'placeholder'}">${esc(label)}</span>
+      <i class="fas fa-chevron-down custom-select-chevron"></i>
+    </button>
+    <div class="custom-select-menu hidden">
+      ${options.map(o => `
+        <button type="button" class="custom-select-option ${o.value === value ? 'active' : ''}" data-value="${esc(o.value)}">
+          <span>${esc(o.label)}</span>
+          <i class="fas fa-check check-icon"></i>
+        </button>
+      `).join('')}
+    </div>
+  `;
+
+  const trigger = container.querySelector('.custom-select-trigger');
+  const menu = container.querySelector('.custom-select-menu');
+  const labelEl = container.querySelector('.custom-select-label');
+
+  function closeMenu(){
+    container.classList.remove('open');
+    menu.classList.add('hidden');
+    if(openCustomSelect === container) openCustomSelect = null;
+  }
+  function openMenu(){
+    if(openCustomSelect && openCustomSelect !== container){
+      openCustomSelect.classList.remove('open');
+      const m = openCustomSelect.querySelector('.custom-select-menu');
+      if(m) m.classList.add('hidden');
+    }
+    container.classList.add('open');
+    menu.classList.remove('hidden');
+    openCustomSelect = container;
+    if(typeof onOpen === 'function') onOpen();
+  }
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if(container.classList.contains('open')) closeMenu();
+    else openMenu();
+  });
+
+  menu.querySelectorAll('.custom-select-option').forEach(opt => {
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const val = opt.dataset.value;
+      const chosen = options.find(o => o.value === val);
+      if(chosen){
+        labelEl.textContent = chosen.label;
+        labelEl.classList.remove('placeholder');
+      }
+      menu.querySelectorAll('.custom-select-option').forEach(o =>
+        o.classList.toggle('active', o.dataset.value === val));
+      closeMenu();
+      if(typeof onChange === 'function') onChange(val);
+    });
+  });
+
+  container._closeMenu = closeMenu;
+}
+
+document.addEventListener('click', () => {
+  if(openCustomSelect){
+    const m = openCustomSelect.querySelector('.custom-select-menu');
+    if(m) m.classList.add('hidden');
+    openCustomSelect.classList.remove('open');
+    openCustomSelect = null;
+  }
+});
+
+/* ============================================================
+   CUSTOM DATE PICKER
+   ============================================================ */
+let openDatePicker = null;
+
+function buildDatePicker({ inputWrap, value, onChange }){
+  if(!inputWrap) return;
+
+  // Build the input field
+  const inputId = 'dp-' + uid();
+  inputWrap.innerHTML = `
+    <input type="text" id="${inputId}" readonly placeholder="YYYY-MM-DD" value="${value || ''}">
+    <button type="button" class="date-icon-btn"><i class="far fa-calendar"></i></button>
+  `;
+
+  const input = inputWrap.querySelector('input');
+  const iconBtn = inputWrap.querySelector('.date-icon-btn');
+
+  // Track displayed month
+  const today = new Date();
+  let pickerYear = value ? new Date(value + 'T00:00:00').getFullYear() : today.getFullYear();
+  let pickerMonth = value ? new Date(value + 'T00:00:00').getMonth() : today.getMonth();
+  let selectedValue = value || '';
+
+  function renderPicker(){
+    const popup = document.getElementById('datePickerPopup');
+    if(!popup) return;
+
+    const firstDay = new Date(pickerYear, pickerMonth, 1).getDay();
+    const daysInMonth = new Date(pickerYear, pickerMonth + 1, 0).getDate();
+
+    const todayISO = (() => {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    })();
+
+    const labelEl = popup.querySelector('#dpLabel');
+    const gridEl = popup.querySelector('#dpGrid');
+
+    labelEl.textContent = MONTHS[pickerMonth] + ' ' + pickerYear;
+
+    let html = '';
+    for(let i = 0; i < firstDay; i++) html += `<div class="dp-cell empty"></div>`;
+    for(let day = 1; day <= daysInMonth; day++){
+      const iso = pickerYear + '-' + String(pickerMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+      const isToday = iso === todayISO;
+      const isSelected = iso === selectedValue;
+      html += `<button type="button" class="dp-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" data-iso="${iso}">${day}</button>`;
+    }
+    gridEl.innerHTML = html;
+
+    gridEl.querySelectorAll('.dp-cell[data-iso]').forEach(cell => {
+      cell.onclick = () => {
+        selectedValue = cell.dataset.iso;
+        input.value = selectedValue;
+        closePicker();
+        if(typeof onChange === 'function') onChange(selectedValue);
+      };
+    });
+  }
+
+  function positionPicker(){
+    const popup = document.getElementById('datePickerPopup');
+    if(!popup) return;
+    const rect = input.getBoundingClientRect();
+    const popupWidth = Math.min(rect.width, 340);
+    popup.style.position = 'fixed';
+    popup.style.top = (rect.bottom + 6) + 'px';
+    popup.style.left = Math.max(12, Math.min(rect.left, window.innerWidth - popupWidth - 12)) + 'px';
+    popup.style.width = popupWidth + 'px';
+  }
+
+  function closePicker(){
+    const popup = document.getElementById('datePickerPopup');
+    if(!popup) return;
+    popup.classList.add('hidden');
+    openDatePicker = null;
+    document.removeEventListener('click', outsideClick);
+    window.removeEventListener('scroll', positionPicker, true);
+  }
+
+  function outsideClick(e){
+    const popup = document.getElementById('datePickerPopup');
+    if(!popup || popup.classList.contains('hidden')) return;
+    if(e.target.closest('#datePickerPopup')) return;
+    if(e.target === input || e.target === iconBtn) return;
+    if(inputWrap.contains(e.target)) return;
+    closePicker();
+  }
+
+  function openPicker(){
+    if(openDatePicker && openDatePicker !== inputWrap){
+      const p = document.getElementById('datePickerPopup');
+      if(p) p.classList.add('hidden');
+    }
+    const popup = document.getElementById('datePickerPopup');
+    if(!popup) return;
+    popup.classList.remove('hidden');
+    renderPicker();
+    positionPicker();
+    openDatePicker = inputWrap;
+    setTimeout(() => {
+      document.addEventListener('click', outsideClick);
+      window.addEventListener('scroll', positionPicker, true);
+    }, 10);
+  }
+
+  function togglePicker(){
+    const popup = document.getElementById('datePickerPopup');
+    if(!popup) return;
+    if(popup.classList.contains('hidden')) openPicker();
+    else closePicker();
+  }
+
+  input.addEventListener('click', (e) => { e.stopPropagation(); togglePicker(); });
+  iconBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePicker(); });
+  inputWrap._openPicker = openPicker;
+
+  // Bind the shared popup nav + quick buttons once
+  const popup = document.getElementById('datePickerPopup');
+  if(popup && !popup._navBound){
+    popup._navBound = true;
+    popup.querySelectorAll('[data-dp-nav]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const dir = Number(btn.dataset.dpNav);
+        pickerMonth += dir;
+        if(pickerMonth < 0){ pickerMonth = 11; pickerYear--; }
+        if(pickerMonth > 11){ pickerMonth = 0; pickerYear++; }
+        renderPicker();
+      });
+    });
+    popup.querySelectorAll('[data-dp-quick]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const kind = btn.dataset.dpQuick;
+        const d = new Date();
+        if(kind === 'today'){}
+        else if(kind === 'tomorrow'){ d.setDate(d.getDate() + 1); }
+        else if(kind === 'clear'){
+          selectedValue = '';
+          const activeInput = openDatePicker ? openDatePicker.querySelector('input') : null;
+          if(activeInput) activeInput.value = '';
+          closePicker();
+          // call onChange with empty string if we can find it
+          if(activeInput && activeInput._onChange) activeInput._onChange('');
+          return;
+        }
+        const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        selectedValue = iso;
+        const activeInput = openDatePicker ? openDatePicker.querySelector('input') : null;
+        if(activeInput){
+          activeInput.value = iso;
+          if(activeInput._onChange) activeInput._onChange(iso);
+        }
+        closePicker();
+      });
+    });
+  }
+
+  input._onChange = onChange;
+}
+
 function todayISO(d){
   d = d || new Date();
   return d.getFullYear() + '-' +
@@ -483,10 +727,10 @@ function openTaskModal(taskId){
       <input type="text" id="taskTitle" placeholder="What needs doing?" value="${esc(task.title)}" maxlength="120" autofocus>
     </div>
 
-    <div class="form-row">
+      <div class="form-row">
       <div class="form-group">
         <label>Due date</label>
-        <input type="date" id="taskDue" value="${esc(task.dueDate || '')}">
+        <div class="date-input-wrap" id="taskDueWrap"></div>
       </div>
       <div class="form-group">
         <label>Category</label>
@@ -522,13 +766,9 @@ function openTaskModal(taskId){
       <input type="checkbox" id="taskRecurring" ${task.recurring?'checked':''} style="width:20px;height:20px;accent-color:var(--accent);margin-left:auto">
     </div>
 
-    <div class="form-group hidden" id="recurrenceGroup">
+       <div class="form-group hidden" id="recurrenceGroup">
       <label>Repeat</label>
-      <select id="taskRecurrenceType">
-        <option value="daily" ${task.recurrenceType==='daily'?'selected':''}>Daily</option>
-        <option value="weekly" ${task.recurrenceType==='weekly'?'selected':''}>Weekly</option>
-        <option value="monthly" ${task.recurrenceType==='monthly'?'selected':''}>Monthly</option>
-      </select>
+      <div class="custom-select" id="recurrenceSelect"></div>
     </div>
 
     <button type="button" class="btn btn-primary" id="saveTaskBtn">
@@ -537,12 +777,33 @@ function openTaskModal(taskId){
     ${editing ? `<button type="button" class="btn btn-danger" id="deleteTaskBtn">Delete Task</button>` : ''}
   `);
 
-  // Priority grid
+   // Priority grid
   modal.querySelectorAll('#priorityGrid button').forEach(btn => {
     btn.onclick = () => {
       modal.querySelectorAll('#priorityGrid button').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     };
+  });
+
+  // Custom date picker
+  let taskDueValue = task.dueDate || '';
+  buildDatePicker({
+    inputWrap: document.getElementById('taskDueWrap'),
+    value: taskDueValue,
+    onChange: (v) => { taskDueValue = v; }
+  });
+
+  // Custom recurrence select
+  let recurrenceValue = task.recurrenceType || 'daily';
+  buildCustomSelect({
+    container: document.getElementById('recurrenceSelect'),
+    value: recurrenceValue,
+    options: [
+      { value: 'daily', label: 'Daily' },
+      { value: 'weekly', label: 'Weekly' },
+      { value: 'monthly', label: 'Monthly' }
+    ],
+    onChange: (v) => { recurrenceValue = v; }
   });
 
   // Recurring toggle
@@ -561,12 +822,12 @@ function openTaskModal(taskId){
 
     const prioBtn = modal.querySelector('#priorityGrid button.active');
     task.title = title;
-    task.dueDate = document.getElementById('taskDue').value || '';
+    task.dueDate = taskDueValue || '';
     task.category = document.getElementById('taskCategory').value.trim();
     task.priority = prioBtn ? prioBtn.dataset.prio : 'medium';
     task.notes = document.getElementById('taskNotes').value.trim();
     task.recurring = recurringCb.checked;
-    task.recurrenceType = document.getElementById('taskRecurrenceType').value || 'daily';
+    task.recurrenceType = recurrenceValue || 'daily';
 
     if(!editing){
       state.tasks.unshift(task);
@@ -604,32 +865,49 @@ function openSearchModal(){
       <input type="text" id="searchInput" placeholder="Title, category, or notes…" value="${esc(ui.search)}" autofocus>
     </div>
 
-    <div class="form-group">
+      <div class="form-group">
       <label>Priority</label>
-      <select id="filterPriority">
-        <option value="all" ${ui.filterPriority==='all'?'selected':''}>All priorities</option>
-        <option value="high" ${ui.filterPriority==='high'?'selected':''}>High only</option>
-        <option value="medium" ${ui.filterPriority==='medium'?'selected':''}>Medium only</option>
-        <option value="low" ${ui.filterPriority==='low'?'selected':''}>Low only</option>
-      </select>
+      <div class="custom-select" id="filterPrioritySelect"></div>
     </div>
 
     <div class="form-group">
       <label>Category</label>
-      <select id="filterCategory">
-        <option value="">All categories</option>
-        ${categories.map(c => `<option value="${esc(c)}" ${ui.filterCategory===c?'selected':''}>${esc(c)}</option>`).join('')}
-      </select>
+      <div class="custom-select" id="filterCategorySelect"></div>
     </div>
 
     <button type="button" class="btn btn-primary" id="applySearchBtn">Apply</button>
     <button type="button" class="btn btn-secondary" id="resetSearchBtn">Reset</button>
   `);
 
+  let filterPriorityValue = ui.filterPriority;
+  let filterCategoryValue = ui.filterCategory;
+
+  buildCustomSelect({
+    container: document.getElementById('filterPrioritySelect'),
+    value: filterPriorityValue,
+    options: [
+      { value: 'all', label: 'All priorities' },
+      { value: 'high', label: 'High only' },
+      { value: 'medium', label: 'Medium only' },
+      { value: 'low', label: 'Low only' }
+    ],
+    onChange: (v) => { filterPriorityValue = v; }
+  });
+
+  const categoryOptions = [{ value: '', label: 'All categories' }]
+    .concat(categories.map(c => ({ value: c, label: c })));
+  buildCustomSelect({
+    container: document.getElementById('filterCategorySelect'),
+    value: filterCategoryValue,
+    options: categoryOptions,
+    placeholder: 'All categories',
+    onChange: (v) => { filterCategoryValue = v; }
+  });
+
   document.getElementById('applySearchBtn').onclick = () => {
     ui.search = document.getElementById('searchInput').value.trim();
-    ui.filterPriority = document.getElementById('filterPriority').value;
-    ui.filterCategory = document.getElementById('filterCategory').value;
+    ui.filterPriority = filterPriorityValue;
+    ui.filterCategory = filterCategoryValue;
     closeModal();
     render();
   };
@@ -853,28 +1131,23 @@ function openSettingsModal(){
       <button class="close-x">&times;</button>
     </div>
 
-    <div class="settings-block">
+      <div class="settings-block">
       <h4><i class="fas fa-list-check" style="color:var(--accent);margin-right:6px"></i> Sort order</h4>
       <div class="blk-sub">How your task list is ordered</div>
-      <select id="sortSelect" style="width:100%;padding:12px 14px;border-radius:14px;border:1.5px solid var(--line);background:var(--bg);font-size:.88rem">
-        <option value="manual" ${ui.sortMode==='manual'?'selected':''}>Manual (as added)</option>
-        <option value="date" ${ui.sortMode==='date'?'selected':''}>By due date</option>
-        <option value="priority" ${ui.sortMode==='priority'?'selected':''}>By priority</option>
-        <option value="created" ${ui.sortMode==='created'?'selected':''}>Newest first</option>
-      </select>
+      <div class="custom-select" id="sortSelectWrap"></div>
     </div>
-
-    <div class="settings-block">
+    
+         <div class="settings-block">
       <h4><i class="fas fa-graduation-cap" style="color:var(--accent);margin-right:6px"></i> Semester dates</h4>
       <div class="blk-sub">Optional — helps track progress</div>
       <div class="form-row">
         <div class="form-group" style="margin:0">
           <label>Start</label>
-          <input type="date" id="semStart" value="${esc(state.semStart||'')}">
+          <div class="date-input-wrap" id="semStartWrap"></div>
         </div>
         <div class="form-group" style="margin:0">
           <label>End</label>
-          <input type="date" id="semEnd" value="${esc(state.semEnd||'')}">
+          <div class="date-input-wrap" id="semEndWrap"></div>
         </div>
       </div>
       <div id="semProgressWrap" class="hidden" style="margin-top:14px">
@@ -913,31 +1186,47 @@ function openSettingsModal(){
       CjayTasks · <span id="versionTrigger">v1.0.0</span>
     </div>
   `);
-
-  // Sort
-  document.getElementById('sortSelect').onchange = (e) => {
-    ui.sortMode = e.target.value;
-    render();
-  };
+   
+    // Sort
+  buildCustomSelect({
+    container: document.getElementById('sortSelectWrap'),
+    value: ui.sortMode,
+    options: [
+      { value: 'manual', label: 'Manual (as added)' },
+      { value: 'date', label: 'By due date' },
+      { value: 'priority', label: 'By priority' },
+      { value: 'created', label: 'Newest first' }
+    ],
+    onChange: (v) => { ui.sortMode = v; render(); }
+  });
 
   // Semester progress
-  const startInput = document.getElementById('semStart');
-  const endInput = document.getElementById('semEnd');
   const progWrap = document.getElementById('semProgressWrap');
   const barFill = document.getElementById('semBarFill');
   const pctText = document.getElementById('semPctText');
 
+  let semStartVal = state.semStart || '';
+  let semEndVal = state.semEnd || '';
+
   function updateSemProgress(){
-    const s = startInput.value, e = endInput.value;
-    if(!s || !e){ progWrap.classList.add('hidden'); return; }
-    const start = new Date(s), end = new Date(e), now = new Date();
+    if(!semStartVal || !semEndVal){ progWrap.classList.add('hidden'); return; }
+    const start = new Date(semStartVal), end = new Date(semEndVal), now = new Date();
     const pct = Math.max(0, Math.min(100, ((now - start) / (end - start)) * 100));
     progWrap.classList.remove('hidden');
     barFill.style.width = pct + '%';
     pctText.textContent = Math.round(pct) + '% through semester';
   }
-  startInput.onchange = () => { state.semStart = startInput.value; saveState(); updateSemProgress(); };
-  endInput.onchange = () => { state.semEnd = endInput.value; saveState(); updateSemProgress(); };
+
+  buildDatePicker({
+    inputWrap: document.getElementById('semStartWrap'),
+    value: semStartVal,
+    onChange: (v) => { semStartVal = v; state.semStart = v; saveState(); updateSemProgress(); }
+  });
+  buildDatePicker({
+    inputWrap: document.getElementById('semEndWrap'),
+    value: semEndVal,
+    onChange: (v) => { semEndVal = v; state.semEnd = v; saveState(); updateSemProgress(); }
+  });
   updateSemProgress();
 
   // Drive
