@@ -58,13 +58,13 @@
 
   <!-- Top bar -->
   <div class="topbar">
-    <div class="brand">
+     <div class="brand">
       <div class="brand-logo" id="brandLogo">
         <i class="fas fa-list-check"></i>
       </div>
       <div class="brand-meta">
-        <div class="brand-eyebrow">Tasks</div>
         <div class="brand-name">CjayTasks</div>
+        <div class="brand-subtitle">Tasks by Cjay</div>
       </div>
     </div>
     <div class="top-actions">
@@ -140,13 +140,19 @@
   <div id="taskList" class="task-list"></div>
 
   <!-- Empty state -->
-  <div class="empty-state hidden" id="emptyState">
+   <div class="empty-state hidden" id="emptyState">
     <svg viewBox="0 0 120 120" fill="none">
-      <rect x="26" y="30" width="68" height="72" rx="14" stroke="currentColor" stroke-width="2.5" opacity=".35"/>
-      <path d="M42 56l8 8 16-16" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>
-      <path d="M42 82l8 8 16-16" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".35"/>
-      <circle cx="88" cy="38" r="8" stroke="currentColor" stroke-width="2.5" opacity=".45"/>
-      <path d="M88 34v5l3 2" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity=".45"/>
+      <!-- Clipboard outline -->
+      <rect x="28" y="28" width="64" height="76" rx="10" stroke="currentColor" stroke-width="2.5" opacity=".28"/>
+      <!-- Clipboard clip at top -->
+      <rect x="48" y="20" width="24" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="2.5" opacity=".45"/>
+      <!-- Three checkmark + line rows -->
+      <path d="M42 54l6 6 12-12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>
+      <line x1="70" y1="54" x2="82" y2="54" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+      <path d="M42 72l6 6 12-12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".40"/>
+      <line x1="70" y1="72" x2="82" y2="72" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".40"/>
+      <path d="M42 90l6 6 12-12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".25"/>
+      <line x1="70" y1="90" x2="82" y2="90" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".25"/>
     </svg>
     <div class="empty-title" id="emptyTitle">No tasks yet</div>
     <div class="empty-sub" id="emptySub">Tap the + button to add your first task.</div>
@@ -181,8 +187,42 @@
   <span>You're offline — changes save locally and sync when you're back</span>
 </div>
 
-<script src="app.js" defer></script>
+<!-- ============================================================
+     CUSTOM DROPDOWN TEMPLATE (populated by JS)
+     ============================================================ -->
+<div class="custom-select" id="customSelectTemplate" style="display:none">
+  <button type="button" class="custom-select-trigger">
+    <span class="custom-select-label">Select…</span>
+    <i class="fas fa-chevron-down custom-select-chevron"></i>
+  </button>
+  <div class="custom-select-menu hidden"></div>
+</div>
 
+<!-- ============================================================
+     CUSTOM DATE PICKER POPUP (populated by JS)
+     ============================================================ -->
+<div class="date-picker-popup hidden" id="datePickerPopup">
+  <div class="date-picker-header">
+    <button type="button" class="dp-nav" data-dp-nav="-1">
+      <i class="fas fa-chevron-left"></i>
+    </button>
+    <div class="dp-label" id="dpLabel">—</div>
+    <button type="button" class="dp-nav" data-dp-nav="1">
+      <i class="fas fa-chevron-right"></i>
+    </button>
+  </div>
+  <div class="dp-dow-row">
+    <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+  </div>
+  <div class="dp-grid" id="dpGrid"></div>
+  <div class="dp-footer">
+    <button type="button" class="dp-quick" data-dp-quick="today">Today</button>
+    <button type="button" class="dp-quick" data-dp-quick="tomorrow">Tomorrow</button>
+    <button type="button" class="dp-quick" data-dp-quick="clear">Clear</button>
+  </div>
+</div>
+
+<script src="app.js" defer></script>
 <script>
 // Service worker registration + update detection
 if ('serviceWorker' in navigator) {
