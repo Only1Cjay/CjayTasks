@@ -1334,6 +1334,84 @@ input,select,textarea{font-family:inherit;color:inherit}
 }
 
 /* ============================================================
+   CONFIRM MODAL
+   ============================================================ */
+.confirm-modal{
+  text-align:center;
+  padding:8px 4px 4px;
+}
+.confirm-icon{
+  width:60px;
+  height:60px;
+  border-radius:20px;
+  background:var(--accent-soft);
+  color:var(--accent);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:1.4rem;
+  margin:0 auto 16px;
+}
+.confirm-icon.danger{
+  background:var(--red-soft);
+  color:var(--red);
+}
+.confirm-title{
+  font-family:'Sora',sans-serif;
+  font-size:1.1rem;
+  font-weight:700;
+  color:var(--text);
+  margin-bottom:8px;
+  letter-spacing:-.02em;
+}
+.confirm-message{
+  font-size:.88rem;
+  color:var(--muted);
+  line-height:1.55;
+  margin-bottom:24px;
+  padding:0 12px;
+}
+.confirm-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.confirm-btn{
+  padding:14px;
+  border-radius:var(--radius-sm);
+  border:none;
+  font-family:inherit;
+  font-weight:700;
+  font-size:.88rem;
+  cursor:pointer;
+  transition:.15s;
+}
+.confirm-btn.cancel{
+  background:var(--card-2);
+  color:var(--text);
+  border:1px solid var(--line);
+}
+.confirm-btn.cancel:hover{
+  background:var(--card);
+}
+.confirm-btn.primary{
+  background:var(--accent);
+  color:#fff;
+  box-shadow:0 8px 16px var(--accent-glow);
+}
+.confirm-btn.primary:hover{
+  background:var(--accent-deep);
+}
+.confirm-btn.danger{
+  background:var(--red);
+  color:#fff;
+  box-shadow:0 8px 16px rgba(211,92,87,.25);
+}
+.confirm-btn.danger:hover{
+  filter:brightness(1.1);
+}
+
+/* ============================================================
    TOAST
    ============================================================ */
 .toast{
