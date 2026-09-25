@@ -1207,16 +1207,15 @@ input,select,textarea{font-family:inherit;color:inherit}
 }
 
 .date-picker-popup{
-  position:absolute;
-  top:calc(100% + 6px);
+  position:fixed;
+  top:0;
   left:0;
-  right:0;
   background:var(--card);
   border:1px solid var(--line);
   border-radius:var(--radius-sm);
   box-shadow:var(--shadow-lg);
   padding:14px;
-  z-index:110;
+  z-index:2500;
   animation:menuPop .15s ease-out;
 }
 .date-picker-header{
