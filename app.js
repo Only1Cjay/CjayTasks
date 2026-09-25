@@ -1637,12 +1637,33 @@ function showUpdateToast(){
   el.className = 'update-toast';
   el.id = 'updateToast';
   el.innerHTML = `
-    <span>✨ New version available</span>
+    <span style="flex:1;min-width:0;line-height:1.3">✨ New version available</span>
     <button class="update-refresh" id="updateRefreshBtn">Refresh</button>
     <button class="update-dismiss" id="updateDismissBtn">✕</button>
   `;
-  el.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:12px 18px;border-radius:999px;font-size:.82rem;font-weight:600;box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:.25s;z-index:3001;display:flex;align-items:center;gap:14px;max-width:calc(100vw - 40px);';
-  document.body.appendChild(el);
+  el.style.cssText = [
+    'position:fixed',
+    'bottom:100px',
+    'left:50%',
+    'transform:translateX(-50%) translateY(20px)',
+    'background:var(--text)',
+    'color:var(--bg)',
+    'padding:14px 16px 14px 18px',
+    'border-radius:20px',
+    'font-size:.85rem',
+    'font-weight:600',
+    'box-shadow:var(--shadow-lg)',
+    'opacity:0',
+    'pointer-events:none',
+    'transition:opacity .25s, transform .25s',
+    'z-index:3001',
+    'display:flex',
+    'align-items:center',
+    'gap:12px',
+    'max-width:calc(100vw - 32px)',
+    'width:auto'
+  ].join(';') + ';';
+   document.body.appendChild(el);
   requestAnimationFrame(() => {
     el.style.opacity = '1';
     el.style.transform = 'translateX(-50%) translateY(0)';
@@ -1658,16 +1679,14 @@ function showUpdateToast(){
 
   updateToastTimer = setTimeout(hideToast, 5000);
 
-  document.getElementById('updateRefreshBtn').style.cssText = 'background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:999px;font-weight:700;font-size:.78rem;text-transform:uppercase;cursor:pointer;';
-  document.getElementById('updateRefreshBtn').onclick = async () => {
+  document.getElementById('updateRefreshBtn').style.cssText = 'background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:999px;font-weight:700;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;flex-shrink:0;white-space:nowrap;';  document.getElementById('updateRefreshBtn').onclick = async () => {
     try{
       const reg = await navigator.serviceWorker.getRegistration();
       if(reg && reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
     }catch(e){}
     setTimeout(() => window.location.reload(), 200);
   };
-  document.getElementById('updateDismissBtn').style.cssText = 'background:transparent;color:var(--bg);opacity:.6;border:none;font-size:1rem;cursor:pointer;';
-  document.getElementById('updateDismissBtn').onclick = () => {
+  document.getElementById('updateDismissBtn').style.cssText = 'background:transparent;color:var(--bg);opacity:.55;border:none;font-size:1.05rem;cursor:pointer;padding:4px 6px;flex-shrink:0;line-height:1;';  document.getElementById('updateDismissBtn').onclick = () => {
     updateToastDismissed = true;
     hideToast();
   };
