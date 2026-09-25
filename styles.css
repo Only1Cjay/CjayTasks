@@ -398,20 +398,6 @@ input,select,textarea{font-family:inherit;color:inherit}
 }
 .task-card:active{transform:scale(.995)}
 
-/* Priority accent bar on the left */
-.task-card::before{
-  content:"";
-  position:absolute;
-  left:0;
-  top:0;
-  bottom:0;
-  width:3px;
-  background:var(--muted);
-}
-.task-card.priority-high::before{background:var(--red)}
-.task-card.priority-medium::before{background:var(--amber)}
-.task-card.priority-low::before{background:var(--teal)}
-
 /* Custom checkbox */
 .task-check{
   width:22px;
