@@ -4,7 +4,7 @@
    Bump CACHE_VERSION whenever you push changes.
    ============================================================ */
 
-const CACHE_VERSION = 'v1.1.2';
+const CACHE_VERSION = 'v1.1.3';
 const CACHE_NAME = 'cjaytasks-' + CACHE_VERSION;
 
 const APP_ASSETS = [
