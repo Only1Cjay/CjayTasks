@@ -200,10 +200,25 @@ function buildDatePicker({ inputWrap, value, onChange }){
     const popup = document.getElementById('datePickerPopup');
     if(!popup) return;
     const rect = input.getBoundingClientRect();
-    const popupWidth = Math.min(rect.width, 340);
+    const popupWidth = Math.min(Math.max(rect.width, 280), 340);
+    const popupHeight = 380; // approximate
+
+    // Prefer below the input, but if it doesn't fit, put it above
+    let top = rect.bottom + 6;
+    if(top + popupHeight > window.innerHeight - 12){
+      top = Math.max(12, rect.top - popupHeight - 6);
+    }
+
+    // Keep it horizontally within the viewport
+    let left = rect.left;
+    if(left + popupWidth > window.innerWidth - 12){
+      left = window.innerWidth - popupWidth - 12;
+    }
+    if(left < 12) left = 12;
+
     popup.style.position = 'fixed';
-    popup.style.top = (rect.bottom + 6) + 'px';
-    popup.style.left = Math.max(12, Math.min(rect.left, window.innerWidth - popupWidth - 12)) + 'px';
+    popup.style.top = top + 'px';
+    popup.style.left = left + 'px';
     popup.style.width = popupWidth + 'px';
   }
 
