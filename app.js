@@ -651,8 +651,16 @@ function toggleTaskDone(id){
 function confirmDelete(id){
   const task = state.tasks.find(t => t.id === id);
   if(!task) return;
-  if(!confirm(`Delete "${task.title || 'this task'}"?`)) return;
-  deleteTask(id);
+  openConfirmModal({
+    title: 'Delete task?',
+    message: `"${task.title || 'This task'}" will be permanently removed.`,
+    confirmLabel: 'Delete',
+    danger: true,
+    onConfirm: () => {
+      deleteTask(id);
+      closeModal();
+    }
+  });
 }
 
 function deleteTask(id){
@@ -684,6 +692,34 @@ function openModal(html){
 function closeModal(){
   overlay.classList.remove('active');
   modal.innerHTML = '';
+}
+
+/* ============================================================
+   CONFIRM MODAL
+   ============================================================ */
+function openConfirmModal({ title, message, confirmLabel, cancelLabel, danger, onConfirm }){
+  openModal(`
+    <div class="confirm-modal">
+      <div class="confirm-icon ${danger ? 'danger' : ''}">
+        <i class="fas fa-${danger ? 'triangle-exclamation' : 'circle-question'}"></i>
+      </div>
+      <h2 class="confirm-title">${esc(title || 'Are you sure?')}</h2>
+      <p class="confirm-message">${esc(message || '')}</p>
+      <div class="confirm-actions">
+        <button type="button" class="confirm-btn cancel" id="confirmCancelBtn">
+          ${esc(cancelLabel || 'Cancel')}
+        </button>
+        <button type="button" class="confirm-btn ${danger ? 'danger' : 'primary'}" id="confirmOkBtn">
+          ${esc(confirmLabel || 'Confirm')}
+        </button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('confirmCancelBtn').onclick = closeModal;
+  document.getElementById('confirmOkBtn').onclick = () => {
+    if(typeof onConfirm === 'function') onConfirm();
+  };
 }
 overlay.addEventListener('click', (e) => {
   if(e.target === overlay) closeModal();
@@ -841,9 +877,19 @@ function openTaskModal(taskId){
   // Delete
   if(editing){
     document.getElementById('deleteTaskBtn').onclick = () => {
-      if(!confirm('Delete this task?')) return;
-      deleteTask(task.id);
       closeModal();
+      setTimeout(() => {
+        openConfirmModal({
+          title: 'Delete task?',
+          message: `"${task.title || 'This task'}" will be permanently removed.`,
+          confirmLabel: 'Delete',
+          danger: true,
+          onConfirm: () => {
+            deleteTask(task.id);
+            closeModal();
+          }
+        });
+      }, 200);
     };
   }
 }
@@ -1241,13 +1287,23 @@ function openSettingsModal(){
 
   // Clear all
   document.getElementById('clearAllBtn').onclick = () => {
-    if(!confirm('Delete ALL tasks? This cannot be undone.')) return;
-    state.tasks = [];
-    state.templates = [];
-    saveState();
     closeModal();
-    render();
-    toast('All data cleared');
+    setTimeout(() => {
+      openConfirmModal({
+        title: 'Clear all data?',
+        message: 'This will delete every task permanently. This cannot be undone.',
+        confirmLabel: 'Clear All',
+        danger: true,
+        onConfirm: () => {
+          state.tasks = [];
+          state.templates = [];
+          saveState();
+          render();
+          closeModal();
+          toast('All data cleared');
+        }
+      });
+    }, 200);
   };
 
   // Version
@@ -1452,19 +1508,28 @@ async function drivePull(){
     const cloud = await res.json();
     if(!cloud || !Array.isArray(cloud.tasks)){ toast('Backup is empty'); return; }
 
-    const localCount = state.tasks.length;
+     const localCount = state.tasks.length;
     const cloudCount = cloud.tasks.length;
 
-    if(!confirm(`Cloud has ${cloudCount} task(s). Local has ${localCount}. Replace local with cloud?`)) return;
-
-    state.tasks = cloud.tasks;
-    state.templates = cloud.templates || [];
-    state.semStart = cloud.semStart || '';
-    state.semEnd = cloud.semEnd || '';
-    saveState();
     closeModal();
-    render();
-    toast('Restored from Drive');
+    setTimeout(() => {
+      openConfirmModal({
+        title: 'Restore from Drive?',
+        message: `Cloud has ${cloudCount} task${cloudCount!==1?'s':''}. Local has ${localCount}. This will replace local data.`,
+        confirmLabel: 'Restore',
+        danger: false,
+        onConfirm: () => {
+          state.tasks = cloud.tasks;
+          state.templates = cloud.templates || [];
+          state.semStart = cloud.semStart || '';
+          state.semEnd = cloud.semEnd || '';
+          saveState();
+          render();
+          closeModal();
+          toast('Restored from Drive');
+        }
+      });
+    }, 200);
   }catch(e){
     console.warn(e);
     toast('Pull failed');
