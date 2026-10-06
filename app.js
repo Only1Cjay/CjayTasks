@@ -13,6 +13,8 @@ const THEME_KEY = 'cjaytasks_theme';
 const DRIVE_FOLDER = 'CjayTasks';
 const DRIVE_FILE = 'cjay-tasks.json';
 const CLIENT_KEY = 'cjay_gdrive_client_id';
+const WORKER_URL = 'https://cjaytasks-worker.monaplayzsbackup.workers.dev';
+const SYNC_TOKEN_KEY = 'cjaytasks_sync_token';
 
 const MONTHS = ['January','February','March','April','May','June',
                 'July','August','September','October','November','December'];
@@ -376,6 +378,8 @@ function loadState(){
   }catch(e){ console.warn('Load failed', e); }
 }
 
+let syncDebounceTimer = null;
+
 function saveState(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -385,6 +389,169 @@ function saveState(){
       semEnd: state.semEnd
     }));
   }catch(e){ console.warn('Save failed', e); }
+
+  // Debounced sync to worker — 2s after last change
+  clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(syncToWorker, 2000);
+}
+
+/* ============================================================
+   SYNC TO WORKER
+   ============================================================ */
+async function syncToWorker(){
+  const token = localStorage.getItem(SYNC_TOKEN_KEY);
+  if(!token){
+    return;
+  }
+  if(!navigator.onLine){
+    return;
+  }
+
+  try{
+    const res = await fetch(WORKER_URL + '/sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Sync-Token': token
+      },
+      body: JSON.stringify({
+        tasks: state.tasks,
+        settings: {
+          semStart: state.semStart,
+          semEnd: state.semEnd
+        }
+      })
+    });
+    if(!res.ok){
+      console.warn('Sync failed:', res.status);
+      return false;
+    }
+    const data = await res.json();
+    if(data.ok){
+      localStorage.setItem('cjaytasks_last_sync', new Date().toISOString());
+      return true;
+    }
+  }catch(e){
+    console.warn('Sync error:', e);
+  }
+  return false;
+}
+
+/* ============================================================
+   WEB PUSH SUBSCRIPTION
+   ============================================================ */
+async function subscribeToPush(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    toast('Push notifications not supported on this browser');
+    return false;
+  }
+
+  const token = localStorage.getItem(SYNC_TOKEN_KEY);
+  if(!token){
+    toast('Set your sync token first');
+    return false;
+  }
+
+  try{
+    // Ask for permission
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted'){
+      toast('Notification permission denied');
+      return false;
+    }
+
+    // Wait for SW to be ready
+    const reg = await navigator.serviceWorker.ready;
+
+    // Get VAPID public key from worker
+    const keyRes = await fetch(WORKER_URL + '/push/vapid-key');
+    if(!keyRes.ok){
+      toast('Could not fetch VAPID key');
+      return false;
+    }
+    const { key } = await keyRes.json();
+    if(!key){
+      toast('VAPID key missing on server');
+      return false;
+    }
+
+    // Subscribe
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(key)
+    });
+
+    // Send subscription to worker
+    const res = await fetch(WORKER_URL + '/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: subscription.toJSON()
+      })
+    });
+
+    if(!res.ok){
+      toast('Subscribe request failed');
+      return false;
+    }
+
+    localStorage.setItem('cjaytasks_push_enabled', 'true');
+    toast('Push notifications enabled ✨');
+    return true;
+  }catch(e){
+    console.warn('Subscribe error:', e);
+    toast('Could not enable push notifications');
+    return false;
+  }
+}
+
+async function unsubscribeFromPush(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub){
+      // Tell worker first
+      await fetch(WORKER_URL + '/push/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: sub.endpoint })
+      }).catch(() => {});
+
+      // Then unsubscribe locally
+      await sub.unsubscribe();
+    }
+    localStorage.removeItem('cjaytasks_push_enabled');
+    toast('Push notifications disabled');
+  }catch(e){
+    console.warn('Unsubscribe error:', e);
+  }
+}
+
+async function getPushStatus(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    return 'unsupported';
+  }
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    return sub ? 'enabled' : 'disabled';
+  }catch(e){
+    return 'disabled';
+  }
+}
+
+// Helper: convert base64 VAPID key to Uint8Array
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i = 0; i < rawData.length; ++i){
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 }
 
 /* ============================================================
@@ -1218,6 +1385,36 @@ function openSettingsModal(){
     </div>
 
     <div class="settings-block">
+      <h4><i class="fas fa-bell" style="color:var(--accent);margin-right:6px"></i> Sync & Notifications</h4>
+      <div class="blk-sub">Get Telegram + push reminders before tasks are due</div>
+
+      <div class="form-group" style="margin-top:10px">
+        <label>Sync token</label>
+        <input type="text" id="syncTokenInput" placeholder="cjt_..." value="${esc(localStorage.getItem(SYNC_TOKEN_KEY)||'')}">
+      </div>
+
+      <div id="syncStatusWrap" style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+        <div class="sync-status-row">
+          <span>Last sync:</span>
+          <strong id="lastSyncText">Never</strong>
+        </div>
+        <div class="sync-status-row">
+          <span>Push notifications:</span>
+          <strong id="pushStatusText">Loading…</strong>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+        <button type="button" class="btn btn-secondary" id="syncNowBtn" style="margin:0;padding:12px;font-size:.78rem">
+          <i class="fas fa-rotate"></i> Sync Now
+        </button>
+        <button type="button" class="btn btn-secondary" id="pushToggleBtn" style="margin:0;padding:12px;font-size:.78rem">
+          <i class="fas fa-bell"></i> Enable Push
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-block">
       <h4><i class="fas fa-cloud" style="color:var(--accent);margin-right:6px"></i> Google Drive</h4>
       <div class="blk-sub">Sync your tasks to Drive (folder: CjayTasks)</div>
       <div class="form-group" style="margin-top:10px">
@@ -1289,6 +1486,66 @@ function openSettingsModal(){
     onChange: (v) => { semEndVal = v; state.semEnd = v; saveState(); updateSemProgress(); }
   });
   updateSemProgress();
+
+  // Sync & Notifications
+  const syncTokenInput = document.getElementById('syncTokenInput');
+  syncTokenInput.onchange = (e) => {
+    const v = e.target.value.trim();
+    if(v) localStorage.setItem(SYNC_TOKEN_KEY, v);
+    else localStorage.removeItem(SYNC_TOKEN_KEY);
+    toast(v ? 'Sync token saved' : 'Sync token removed');
+    // Sync right away
+    if(v) syncToWorker();
+  };
+
+  const lastSyncText = document.getElementById('lastSyncText');
+  const storedSync = localStorage.getItem('cjaytasks_last_sync');
+  if(lastSyncText){
+    lastSyncText.textContent = storedSync
+      ? new Date(storedSync).toLocaleString()
+      : 'Never';
+  }
+
+  const pushStatusText = document.getElementById('pushStatusText');
+  const pushToggleBtn = document.getElementById('pushToggleBtn');
+
+  (async () => {
+    const status = await getPushStatus();
+    if(pushStatusText){
+      pushStatusText.textContent =
+        status === 'enabled' ? '✅ Enabled' :
+        status === 'unsupported' ? 'Not supported' :
+        'Disabled';
+    }
+    if(pushToggleBtn && status === 'enabled'){
+      pushToggleBtn.innerHTML = '<i class="fas fa-bell-slash"></i> Disable Push';
+    }
+  })();
+
+  document.getElementById('syncNowBtn').onclick = async () => {
+    toast('Syncing…');
+    const ok = await syncToWorker();
+    toast(ok ? 'Synced ✓' : 'Sync failed');
+    if(lastSyncText){
+      const s = localStorage.getItem('cjaytasks_last_sync');
+      if(s) lastSyncText.textContent = new Date(s).toLocaleString();
+    }
+  };
+
+  pushToggleBtn.onclick = async () => {
+    const status = await getPushStatus();
+    if(status === 'enabled'){
+      await unsubscribeFromPush();
+      pushToggleBtn.innerHTML = '<i class="fas fa-bell"></i> Enable Push';
+      if(pushStatusText) pushStatusText.textContent = 'Disabled';
+    } else {
+      const ok = await subscribeToPush();
+      if(ok){
+        pushToggleBtn.innerHTML = '<i class="fas fa-bell-slash"></i> Disable Push';
+        if(pushStatusText) pushStatusText.textContent = '✅ Enabled';
+      }
+    }
+  };
 
   // Drive
   document.getElementById('driveConnectBtn').onclick = driveConnect;
