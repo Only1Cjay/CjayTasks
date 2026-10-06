@@ -1032,6 +1032,24 @@ input,select,textarea{font-family:inherit;color:inherit}
 .settings-block.danger{
   border-color:var(--red-soft);
 }
+
+/* Sync status rows */
+.sync-status-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:.78rem;
+  padding:6px 0;
+  color:var(--muted);
+  border-bottom:1px dashed var(--line);
+}
+.sync-status-row:last-child{
+  border-bottom:none;
+}
+.sync-status-row strong{
+  color:var(--text-soft);
+  font-weight:600;
+}
 .sem-bar-track{
   height:8px;
   border-radius:999px;
