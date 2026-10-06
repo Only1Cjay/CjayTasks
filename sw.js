@@ -4,7 +4,7 @@
    Bump CACHE_VERSION whenever you push changes.
    ============================================================ */
 
-const CACHE_VERSION = 'v1.1.4';
+const CACHE_VERSION = 'v1.2.0';
 const CACHE_NAME = 'cjaytasks-' + CACHE_VERSION;
 
 const APP_ASSETS = [
@@ -135,4 +135,52 @@ self.addEventListener('message', (event) => {
   if(event.data && event.data.type === 'SKIP_WAITING'){
     self.skipWaiting();
   }
+});
+
+/* ============================================================
+   PUSH NOTIFICATIONS
+   ============================================================ */
+self.addEventListener('push', (event) => {
+  let data = {
+    title: 'CjayTasks',
+    body: 'You have a task update',
+    tag: 'cjaytasks'
+  };
+
+  try{
+    if(event.data){
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    }
+  }catch(e){
+    console.warn('Push parse error:', e);
+  }
+
+  const options = {
+    body: data.body,
+    tag: data.tag,
+    icon: 'icon.svg',
+    badge: 'icon.svg',
+    vibrate: [100, 50, 100],
+    data: { url: '/' }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for(const c of list){
+        if('focus' in c){
+          c.navigate('/');
+          return c.focus();
+        }
+      }
+      if(clients.openWindow) return clients.openWindow('/');
+    })
+  );
 });
