@@ -24,6 +24,7 @@ const MONTHS = ['January','February','March','April','May','June',
    ============================================================ */
 let state = {
   tasks: [],
+  deletedIds: [],
   templates: [],
   semStart: '',
   semEnd: ''
@@ -371,6 +372,7 @@ function loadState(){
     if(raw){
       const p = JSON.parse(raw);
       state.tasks = Array.isArray(p.tasks) ? p.tasks : [];
+      state.deletedIds = Array.isArray(p.deletedIds) ? p.deletedIds : [];
       state.templates = Array.isArray(p.templates) ? p.templates : [];
       state.semStart = p.semStart || '';
       state.semEnd = p.semEnd || '';
@@ -385,6 +387,7 @@ function saveState(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       tasks: state.tasks,
+      deletedIds: state.deletedIds,
       templates: state.templates,
       semStart: state.semStart,
       semEnd: state.semEnd
@@ -408,6 +411,9 @@ async function syncToWorker(){
   if(!navigator.onLine) return false;
 
   try{
+    const localTaskCount = state.tasks.length;
+    const localIds = new Set(state.tasks.map(t => t.id));
+
     const res = await fetch(WORKER_URL + '/sync', {
       method: 'POST',
       headers: {
@@ -416,6 +422,7 @@ async function syncToWorker(){
       },
       body: JSON.stringify({
         tasks: state.tasks,
+        deletedIds: state.deletedIds,
         settings: {
           semStart: state.semStart,
           semEnd: state.semEnd
@@ -431,19 +438,27 @@ async function syncToWorker(){
 
     localStorage.setItem('cjaytasks_last_sync', new Date().toISOString());
 
-    // Merge bot-added tasks back into the app
-    if(data.merged > 0 && Array.isArray(data.tasks)){
+    // Replace local with the authoritative merged state
+    if(Array.isArray(data.tasks) && Array.isArray(data.deletedIds)){
+      const remoteTaskCount = data.tasks.length;
+
+      // Detect new tasks from elsewhere
+      const newTaskCount = data.tasks.filter(t => !localIds.has(t.id)).length;
+
       syncingFromWorker = true;
       state.tasks = data.tasks;
+      state.deletedIds = data.deletedIds;
       saveState();
       syncingFromWorker = false;
 
-      // Only re-render if the task list is visible
       if(typeof render === 'function') render();
 
-      // Notify the user
-      const n = data.merged;
-      toast(`${n} task${n === 1 ? '' : 's'} synced from Telegram ✨`);
+      // Toast only if something meaningful changed
+      if(newTaskCount > 0){
+        toast(`${newTaskCount} task${newTaskCount === 1 ? '' : 's'} synced from Telegram ✨`);
+      } else if(remoteTaskCount < localTaskCount){
+        toast('Tasks synced from other device');
+      }
     }
 
     return true;
@@ -742,7 +757,7 @@ function renderTaskList(){
     const priorityLabel = task.priority === 'high' ? 'High'
       : task.priority === 'low' ? 'Low' : '';
 
-    return `<div class="task-card ${isDone?'done':''} priority-${task.priority||'medium'}" data-id="${task.id}">
+    return `<div class="task-card ${isDone?'done':''} priority-${task.priority||'medium'} ${task.source === 'telegram' ? 'source-telegram' : ''}" data-id="${task.id}">
       <div class="task-check" data-check="${task.id}">
         <i class="fas fa-check"></i>
       </div>
@@ -753,7 +768,6 @@ function renderTaskList(){
           ${priorityLabel ? `<span class="priority-badge ${task.priority}">${priorityLabel}</span>` : ''}
           ${task.category ? `<span class="meta-pill category"><i class="fas fa-tag"></i>${esc(task.category)}</span>` : ''}
           ${task.recurring ? `<span class="meta-pill recurring"><i class="fas fa-rotate"></i>${task.recurrenceType}</span>` : ''}
-          ${task.source === 'telegram' ? `<span class="meta-pill telegram" title="Added via Telegram"><i class="fab fa-telegram"></i></span>` : ''}
         </div>
       </div>
       <div class="task-actions">
@@ -874,10 +888,14 @@ function deleteTask(id){
   if(idx < 0) return;
   const removed = state.tasks[idx];
   state.tasks.splice(idx, 1);
+  // Add to tombstones
+  if(!state.deletedIds.includes(id)) state.deletedIds.push(id);
   saveState();
   render();
   toast('Task deleted', 'Undo', () => {
     state.tasks.splice(idx, 0, removed);
+    // Remove from tombstones
+    state.deletedIds = state.deletedIds.filter(x => x !== id);
     saveState();
     render();
   });
