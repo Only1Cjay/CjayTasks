@@ -379,6 +379,7 @@ function loadState(){
 }
 
 let syncDebounceTimer = null;
+let syncingFromWorker = false;
 
 function saveState(){
   try{
@@ -390,6 +391,9 @@ function saveState(){
     }));
   }catch(e){ console.warn('Save failed', e); }
 
+  // Don't push back to worker if we just received a merge
+  if(syncingFromWorker) return;
+
   // Debounced sync to worker — 2s after last change
   clearTimeout(syncDebounceTimer);
   syncDebounceTimer = setTimeout(syncToWorker, 2000);
@@ -400,12 +404,8 @@ function saveState(){
    ============================================================ */
 async function syncToWorker(){
   const token = localStorage.getItem(SYNC_TOKEN_KEY);
-  if(!token){
-    return;
-  }
-  if(!navigator.onLine){
-    return;
-  }
+  if(!token) return false;
+  if(!navigator.onLine) return false;
 
   try{
     const res = await fetch(WORKER_URL + '/sync', {
@@ -427,15 +427,38 @@ async function syncToWorker(){
       return false;
     }
     const data = await res.json();
-    if(data.ok){
-      localStorage.setItem('cjaytasks_last_sync', new Date().toISOString());
-      return true;
+    if(!data.ok) return false;
+
+    localStorage.setItem('cjaytasks_last_sync', new Date().toISOString());
+
+    // Merge bot-added tasks back into the app
+    if(data.merged > 0 && Array.isArray(data.tasks)){
+      syncingFromWorker = true;
+      state.tasks = data.tasks;
+      saveState();
+      syncingFromWorker = false;
+
+      // Only re-render if the task list is visible
+      if(typeof render === 'function') render();
+
+      // Notify the user
+      const n = data.merged;
+      toast(`${n} task${n === 1 ? '' : 's'} synced from Telegram ✨`);
     }
+
+    return true;
   }catch(e){
     console.warn('Sync error:', e);
   }
   return false;
 }
+
+// Sync when the tab regains focus (covers: user switches to Telegram, adds task, comes back)
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden){
+    syncToWorker();
+  }
+});
 
 /* ============================================================
    WEB PUSH SUBSCRIPTION
@@ -730,6 +753,7 @@ function renderTaskList(){
           ${priorityLabel ? `<span class="priority-badge ${task.priority}">${priorityLabel}</span>` : ''}
           ${task.category ? `<span class="meta-pill category"><i class="fas fa-tag"></i>${esc(task.category)}</span>` : ''}
           ${task.recurring ? `<span class="meta-pill recurring"><i class="fas fa-rotate"></i>${task.recurrenceType}</span>` : ''}
+          ${task.source === 'telegram' ? `<span class="meta-pill telegram" title="Added via Telegram"><i class="fab fa-telegram"></i></span>` : ''}
         </div>
       </div>
       <div class="task-actions">
@@ -2021,6 +2045,11 @@ function boot(){
 
   // Drive init (only if client ID set)
   initDrive();
+
+  // Sync to worker on boot — picks up any bot-added tasks
+  setTimeout(() => {
+    syncToWorker();
+  }, 500);
 
   // Hide loading screen
   setTimeout(() => {
