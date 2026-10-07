@@ -490,6 +490,18 @@ input,select,textarea{font-family:inherit;color:inherit}
   background:var(--teal-soft);
   color:var(--teal);
 }
+.meta-pill.telegram{
+  background:#E3F2FD;
+  color:#0088CC;
+  padding:3px 7px;
+}
+.meta-pill.telegram i{
+  font-size:.72rem;
+}
+[data-theme="dark"] .meta-pill.telegram{
+  background:rgba(0,136,204,.18);
+  color:#4DB8FF;
+}
 
 /* Priority badge */
 .priority-badge{
