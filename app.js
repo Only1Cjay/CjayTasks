@@ -414,7 +414,7 @@ async function syncToWorker(){
     const localTaskCount = state.tasks.length;
     const localIds = new Set(state.tasks.map(t => t.id));
 
-    const res = await fetch(WORKER_URL + '/sync', {
+    const res = await fetch(WORKER_URL + '/v1/sync/cjaytasks', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
