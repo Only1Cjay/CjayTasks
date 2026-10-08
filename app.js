@@ -13,7 +13,7 @@ const THEME_KEY = 'cjaytasks_theme';
 const DRIVE_FOLDER = 'CjayTasks';
 const DRIVE_FILE = 'cjay-tasks.json';
 const CLIENT_KEY = 'cjay_gdrive_client_id';
-const WORKER_URL = 'https://cjaytasks-worker.monaplayzsbackup.workers.dev';
+const WORKER_URL = 'https://cjay-cloud.monaplayzsbackup.workers.dev';
 const SYNC_TOKEN_KEY = 'cjaytasks_sync_token';
 
 const MONTHS = ['January','February','March','April','May','June',
@@ -420,9 +420,13 @@ async function syncToWorker(){
         'Content-Type': 'application/json',
         'X-Sync-Token': token
       },
-      body: JSON.stringify({
-        tasks: state.tasks,
-        deletedIds: state.deletedIds,
+          body: JSON.stringify({
+        collections: {
+          tasks: state.tasks
+        },
+        deletedIds: {
+          tasks: state.deletedIds
+        },
         settings: {
           semStart: state.semStart,
           semEnd: state.semEnd
@@ -439,15 +443,18 @@ async function syncToWorker(){
     localStorage.setItem('cjaytasks_last_sync', new Date().toISOString());
 
     // Replace local with the authoritative merged state
-    if(Array.isArray(data.tasks) && Array.isArray(data.deletedIds)){
-      const remoteTaskCount = data.tasks.length;
+    const remoteTasks = data.collections?.tasks;
+    const remoteDeleted = data.deletedIds?.tasks;
+
+    if(Array.isArray(remoteTasks) && Array.isArray(remoteDeleted)){
+      const remoteTaskCount = remoteTasks.length;
 
       // Detect new tasks from elsewhere
-      const newTaskCount = data.tasks.filter(t => !localIds.has(t.id)).length;
+      const newTaskCount = remoteTasks.filter(t => !localIds.has(t.id)).length;
 
       syncingFromWorker = true;
-      state.tasks = data.tasks;
-      state.deletedIds = data.deletedIds;
+      state.tasks = remoteTasks;
+      state.deletedIds = remoteDeleted;
       saveState();
       syncingFromWorker = false;
 
@@ -502,8 +509,8 @@ async function subscribeToPush(){
     const reg = await navigator.serviceWorker.ready;
 
     // Get VAPID public key from worker
-    const keyRes = await fetch(WORKER_URL + '/push/vapid-key');
-    if(!keyRes.ok){
+    const keyRes = await fetch(WORKER_URL + '/v1/push/cjaytasks/vapid-key');
+     if(!keyRes.ok){
       toast('Could not fetch VAPID key');
       return false;
     }
@@ -520,7 +527,7 @@ async function subscribeToPush(){
     });
 
     // Send subscription to worker
-    const res = await fetch(WORKER_URL + '/push/subscribe', {
+    const res = await fetch(WORKER_URL + '/v1/push/cjaytasks/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -549,7 +556,7 @@ async function unsubscribeFromPush(){
     const sub = await reg.pushManager.getSubscription();
     if(sub){
       // Tell worker first
-      await fetch(WORKER_URL + '/push/unsubscribe', {
+      await fetch(WORKER_URL + '/v1/push/cjaytasks/unsubscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ endpoint: sub.endpoint })
